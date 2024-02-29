@@ -1,43 +1,86 @@
-body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
-}
-
-.container {
-    display: flex;
-    flex-direction: row;
-}
-
+/* Custom styles */
 .sidebar {
-    flex: 1;
-    background-color: #f0f0f0;
+    height: 100vh; /* Adjust as needed */
+    position: sticky;
+    top: 0;
+    z-index: 1000; /* Ensure sidebar is above other content */
+}
+
+
+.sidebar .nav-link {
+    color: #fff; /* White color for links */
+    text-align: center; /* Center the text */
+    font-weight: bold;
+    font-size: larger;
+}
+
+.profile img {
+    width: 150px; /* Adjust the width of the photo */
+    border-radius: 50%; /* Make the photo round */
+    display: block;
+    margin: 0 auto; /* Center the photo */
+}
+
+.profile .icon {
+    width: 50px; /* Adjust the width of the photo */
+    border-radius: 75%; /* Make the photo round */
+    display: block;
+    margin: 0px auto; /* Center the photo */
+    border-right: 0px;
+    border-left: 0px;
+    border-top: 0px;
+    border-bottom: 0px;
+}
+
+.profile ul {
+    padding-left: 0; /* Remove default padding */
+}
+
+.profile .nav-link {
+    padding: 5px; /* Add some padding to the links */
+}
+
+.h3 {
+    color: #464646; /* Center the text */
+}
+
+/* CSS for the container */
+.container {
+    background-color: rgb(50, 50, 50); /* Blue background */
+    color: white; /* White text */
+    border-radius: 10px; /* Rounded corners */
+    border : 2px solid black;
     padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    max-width: 95%/* Set maximum width */
 }
 
-.main-content {
-    flex: 3;
-    padding: 20px;
+/* CSS for the image */
+.logo img {
+max-width: 100px; /* Adjust image size */
+background-color: white;
+border : 3px solid black;
+height: auto;
+border-radius: 25px; /* Rounded corners */
 }
 
-.sidebar h2 {
-    margin-top: 0;
+/* CSS for the title and subtitle */
+.info {
+flex-grow: 1;
 }
 
-.sidebar ul {
-    list-style-type: none;
-    padding: 0;
+/* CSS for the subtitle */
+.subtitle {
+font-size: 16px;
+font-style: italic;
 }
 
-.sidebar ul li {
-    margin-bottom: 10px;
-}
-
-.sidebar ul li a {
-    text-decoration: none;
-    color: #333;
-}
-
-.sidebar ul li a:hover {
-    color: #666;
+/* CSS for the date */
+.date {
+    font-size: 14px;
+    font-style: italic;
+    text-align: right;
+    align-items: right;
 }

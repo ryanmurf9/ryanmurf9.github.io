@@ -14,7 +14,7 @@
   <div class="container-fluid">
     <div class="row">
       <!-- Sidebar -->
-      <div class="col-2 sidebar">
+      <div class="col-lg-3 col-md-4 sidebar d-none d-lg-block">
         <!-- Profile picture -->
         <div class="row mt-3">
           <div class="col text-center">
@@ -38,7 +38,7 @@
         <h5 class="text-center"><a href="index.html#resumepdf" class="white-link">Resume (PDF)</a></h5>
       </div>
         <!-- Main content -->
-        <div class="col">
+        <div class="col-lg-9 col-md-8 main-content">
             <div id="progress-bar">
                 <div class="progress"></div>
         </div>
@@ -48,7 +48,7 @@
             <img class="img-fluid align-middle" src="assets/shotchart.jpg" alt="Basketball Shot Chart">
         </div>
         <br>
-        <h1 class="text-center"><strong>Hoops Data ETL</strong></h1>
+        <h1 class="text-center"><strong>Slam Dunk Scraping</strong></h1>
         <p class="text-center">Basic Web Scraping of Basketball-Reference.com</p>
         <!-- Small Date italic and centered -->
         <p class="text-center"><small>2/29/2024</small></p>
@@ -138,7 +138,53 @@ team_initials = {
                         <li>Return the name(s) (Can be more than one if two players have the exact same name)</li>
                     </ol>
                     <p>The function I've written below does this:</p>
-                    <br>
+                    <pre class="language-python">
+                        <code class="language-python">
+#Function to get player ID from a player name
+def getPlayerIDFromName(player_name):
+    #First, convert the player name to the format used in the URL
+    #Get the first 5 letters of the last name and make it lowercase
+    last_name = player_name.split(" ")[-1]
+    last_name = last_name[:5].lower()
+
+    #Get the first 2 letters of the first name and make it lowercase
+    first_name = player_name.split(" ")[0]
+    first_name = first_name[:2].lower()
+
+    #Combine the two and add a 01 to the end
+    player_id = last_name + first_name + "01"
+
+    #Next we need to confirm that the player ID is valid
+    page = requests.get("https://www.basketball-reference.com/players/" + last_name[0] + "/" + player_id + ".html")
+
+    #If the page doesn't exist return None
+    if page.status_code == 404:
+        print("Player not found: " + player_name)
+        return None
+    
+    player_ids = []
+
+    #Loop through the player IDs until we run out of names
+    while page.status_code != 404:
+        #If the page exists and the player name matches the original name, return the player ID
+        soup = BeautifulSoup(page.content, 'html.parser')
+
+        #The player name is thr first h1 tag
+        player_name = soup.find('h1').text
+
+        if player_name == player_name:
+            player_ids.append(player_id)
+        
+        #Increment the player ID
+        player_id = player_id[:-2] + str(int(player_id[-2:]) + 1).zfill(2)
+
+        #Request the next page
+        page = requests.get("https://www.basketball-reference.com/players/" + last_name[0] + "/" + player_id + ".html")
+
+    return player_ids
+                        </code>
+                    </pre>
+                    <br><br>                          
                     <h3><strong>Getting Game IDs</strong></h3>
                     <p>Game IDs are easier to get since they are all unique. To find the game IDs for a given year and team I wrote the following function:</p>
                     <pre class="language-python">
@@ -193,9 +239,9 @@ def getGameIDsFromTeamYear(team_initials, year):
         return []
                         </code>
                     </pre>
-                    <br>
-                    <h3><strong></strong></h3>
-
+                    <br><br>
+                    <h3><strong>Getting Player Stats</strong></h3>
+                    <p>Great! So now that we have both the player and game IDs we can start scraping the data. I've written a function below to get a player's stats for a given year:</p>
                 </div>
                 <div class="col-0"></div>
             </div>

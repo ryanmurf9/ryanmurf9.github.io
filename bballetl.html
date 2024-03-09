@@ -71,11 +71,10 @@
                     </ul>
                     <br>
                     <h3><strong>Goal</strong></h3>
-                    <p>The goal of this overview is to show how to use BeautifulSoup to scrape data from Basketball-Reference. I'll be showing how to get player data, game data, and team data. I'll also show how to save the data to a .csv file for later use.</p>
+                    <p>The goal of this overview is to show how to use BeautifulSoup to scrape data from Basketball-Reference. I'll be showing how to get player IDs and statlines. I'll also be showing how to compile and save some of thet information</p>
                     <br>
                     <h3><strong>Getting Started with Basketball-Reference</strong></h3>
                     <p>In order to get any information using BeautifulSoup, we first need to understand how the directories work on Basketball-Reference. </p>
-                    <br>
                     <p>On basketball refrence there are 4 main pieces of data needed to find most pages:</p>
                     <ul>
                         <li> <strong>Year: </strong>The year is represented by a 4 digit integer (ex. 2022)</li>
@@ -125,8 +124,8 @@ team_initials = {
                     <li> <strong>Game ID: </strong>Game IDs are in the format of [YYYYMMDD][3 letter abbreviation of the home team] (ex. 202402270BOS for the Celtic's home win over the Sixers a few days ago)</li>
                     </ul>
                     <br>
-                    <h3><strong>Getting Player IDs</strong></h3>
                     <div class="alert alert-warning" role="alert">Head's Up: Basketball-Reference will lock you out for an hour if you make more than 20 calls in a minute so keep that in mind.</div>
+                    <h3><strong>Getting Player IDs</strong></h3>
                     <p>Since there can be duplicates of the first part of the player ID (harrito can be both Tony Harris and Tobias Harris) further confirmation needs to be done to get the proper player ID. An example player page is shown below:</p>
                     <img class="rounded mx-auto d-block img-thumbnail" src="assets/bballplayerscreen.png" alt="Player Page">
                     <br>
@@ -185,63 +184,147 @@ def getPlayerIDFromName(player_name):
                         </code>
                     </pre>
                     <br><br>                          
-                    <h3><strong>Getting Game IDs</strong></h3>
-                    <p>Game IDs are easier to get since they are all unique. To find the game IDs for a given year and team I wrote the following function:</p>
+                    <h3><strong>Getting Player Stats</strong></h3>
+                    <p>Player Stats can be pulled using the player ID and the year. The following function does this:</p>
                     <pre class="language-python">
                         <code class="language-python">
-#Returns an array of game IDs for a given team (3 letter string) and year (int)
-def getGameIDsFromTeamYear(team_initials, year):
+#Get a player's stats for a given season provided a player ID and a year
+#Returns a pandas dataframe with the stats
+#Each row is a game and the columns are the stats
+def getPlayerStatLogFromIDYear(player_id, year):
     try:
-        #Go to the team's schedule page
-        url = "https://www.basketball-reference.com/teams/" + team_initials + "/" + str(year) + "_games.html"
+        #Go to the player's page and get the game log
+        url = "https://www.basketball-reference.com/players/" + player_id[0] + "/" + player_id + "/gamelog/" + str(year)
         page = requests.get(url)
         soup = BeautifulSoup(page.content, 'html.parser')
 
-        #Find the table with the schedule and get all of the rows
-        table = soup.find('table')
+        #Find the table with the game log <tbody>
+        table = soup.find('tbody')
         rows = table.find_all('tr')
 
-        #Within the rows look for the class="center iz" data-stat="box_score_text" tag
-        #Each one will contain a link to the game which includes the game ID
-        game_ids = []
+        #Create a pandas dataframe to store the stats
+        #ID is the game ID
+        #Opponent is the team the player played against
+        #Home is a boolean indicating if the player's team was home
+        #Minutes is the number of minutes the player played as a string
+        #Everything else is the player's stats
+        columns = ["ID", "Opponent", "Home", "Result", "Mins", "FG", "FGA", "FG%", "3P", "3PA", "3P%", "FT", "FTA", "FT%", "ORB", "DRB", "TRB", "AST", "STL", "BLK", "TOV", "PF", "PTS", "Game Score", "+/-"]
+        df = pd.DataFrame(columns=columns)
+
         for row in rows:
-            game_id = row.find('td', {'data-stat': 'box_score_text'})
-            if game_id is not None:
-                game_id = game_id.find('a')
-                if game_id is not None:
-                    #Each game ID is in the format '/boxscores/202310160BOS.html'
-                    game_id = game_id['href']
-                    #Remove the /boxscores/ and .html
-                    game_id = game_id.split('/')[2]
-                    game_id = game_id[:-5]
-                    game_ids.append(game_id)
+            #First thing we have to do is check if the row is a header row (The first column says Rk)
+            if row.find('th').text == "Rk":
+                print("Header row")
+                continue
 
-        #We want to remove games that haven't been played yet
-        today = date.today()
-        today = today.strftime("%Y%m%d")
+            #We also have to see if the player was active for the game (The 9th column says "Inactive", "Did Not Dress", or "Did Not Play")
+            #Check all columns for this string
+            columns = row.find_all('td')
+            inactive = False
+            for column in columns:
+                if column.text == "Inactive":
+                    inactive = True
+                    break
+                if column.text == "Did Not Dress":
+                    inactive = True
+                    break
+                if column.text == "Did Not Play":
+                    inactive = True
+                    break
+                if column.text == "Player Suspended":
+                    inactive = True
+                    break
+                if column.text == "Not With Team":
+                    inactive = True
+                    break
+            
+            if inactive:
+                print("Game not played")
+                continue
 
-        #Convert the game IDs to dates and remove the ones that haven't been played yet
-        game_dates = []
-        for game_id in game_ids:
-            game_date = game_id[:8]
-            game_dates.append(game_date)
+            #Get the game ID (td with data_stat="date_game")
+            game_id = row.find('td', {'data-stat': 'date_game'}).find('a')['href']
+            game_id = game_id.split('/')[2][:-5]
 
-        #Remove the game IDs that haven't been played yet
-        game_ids = [game_ids[i] for i in range(len(game_ids)) if int(game_dates[i]) &lt; int(today)]
+            #Get the home or away bool (td with data_stat="game_location")
+            home = row.find('td', {'data-stat': 'game_location'}).text
+            home = home == "@"
 
-        return game_ids
+            #Get the opponent (td with data_stat="opp_id")
+            opponent = row.find('td', {'data-stat': 'opp_id'}).text
 
-    except:
-        print("Error getting game IDs for team: " + team_initials + " " + str(year) + "\n\t" + url)
-        #See if the page that was requested redirects to a 429 page
+            #Get the result (td with data_stat="game_result")
+            result = row.find('td', {'data-stat': 'game_result'}).text
+            result = result.split(" ")[0]
+
+            #Get the minutes (td with data_stat="mp")
+            minutes = row.find('td', {'data-stat': 'mp'}).text
+
+            #Get FG, FGA, FG%, 3P, 3PA, 3P%, FT, FTA, FT%, ORB, DRB, TRB, AST, STL, BLK, TOV, PF, PTS, Game Score, +/-
+            fg = row.find('td', {'data-stat': 'fg'}).text
+            fga = row.find('td', {'data-stat': 'fga'}).text
+            fg_pct = row.find('td', {'data-stat': 'fg_pct'}).text
+            three_p = row.find('td', {'data-stat': 'fg3'}).text
+            three_pa = row.find('td', {'data-stat': 'fg3a'}).text
+            three_p_pct = row.find('td', {'data-stat': 'fg3_pct'}).text
+            ft = row.find('td', {'data-stat': 'ft'}).text
+            fta = row.find('td', {'data-stat': 'fta'}).text
+            ft_pct = row.find('td', {'data-stat': 'ft_pct'}).text
+            orb = row.find('td', {'data-stat': 'orb'}).text
+            drb = row.find('td', {'data-stat': 'drb'}).text
+            trb = row.find('td', {'data-stat': 'trb'}).text
+            ast = row.find('td', {'data-stat': 'ast'}).text
+            stl = row.find('td', {'data-stat': 'stl'}).text
+            blk = row.find('td', {'data-stat': 'blk'}).text
+            tov = row.find('td', {'data-stat': 'tov'}).text
+            pf = row.find('td', {'data-stat': 'pf'}).text
+            pts = row.find('td', {'data-stat': 'pts'}).text
+            game_score = row.find('td', {'data-stat': 'game_score'}).text
+            plus_minus = row.find('td', {'data-stat': 'plus_minus'}).text
+
+            #Add the stats to the dataframe
+            df = df._append({"ID": game_id, "Opponent": opponent, "Home": home, "Result": result, "Mins": minutes, "FG": fg, "FGA": fga, "FG%": fg_pct, "3P": three_p, "3PA": three_pa, "3P%": three_p_pct, "FT": ft, "FTA": fta, "FT%": ft_pct, "ORB": orb, "DRB": drb, "TRB": trb, "AST": ast, "STL": stl, "BLK": blk, "TOV": tov, "PF": pf, "PTS": pts, "Game Score": game_score, "+/-": plus_minus}, ignore_index=True)
+
+        return df
+    except Exception as e:
+        print("Error getting player stat log for player: " + player_id + " " + str(year) + "\n\t" + url)
+        print(e)
+
+        #Check if the page that was requested redirects to a 429 page
         if page.status_code == 429:
             print("Error 429: Too many requests")
-        return []
-                        </code>
-                    </pre>
-                    <br><br>
-                    <h3><strong>Getting Player Stats</strong></h3>
-                    <p>Great! So now that we have both the player and game IDs we can start scraping the data. I've written a function below to get a player's stats for a given year:</p>
+        if page.status_code == 404:
+            print("Error 404: Page not found")
+        
+        return None
+              </code>
+              </pre>
+              <br><br>
+              <h3><strong>Compiling Data and Saving It</strong></h3>
+              <p>In order to save this player data to a file, pandas offers a .to_csv method that can be used to save the data to a .csv file. The following code shows how to get the player data and save it to a .csv file:</p>
+              <pre class="language-python">
+                <code class="language-python">
+#Get the player ID for Jayson Tatum
+player_id = getPlayerIDFromName("Jayson Tatum")
+
+#Get Tatum's stats for his regular season career
+stat_log_2018 = getPlayerStatLogFromIDYear(player_id[0], 2018)
+stat_log_2019 = getPlayerStatLogFromIDYear(player_id[0], 2019)
+stat_log_2020 = getPlayerStatLogFromIDYear(player_id[0], 2020)
+stat_log_2021 = getPlayerStatLogFromIDYear(player_id[0], 2021)
+stat_log_2022 = getPlayerStatLogFromIDYear(player_id[0], 2022)
+stat_log_2023 = getPlayerStatLogFromIDYear(player_id[0], 2023)
+stat_log_2024 = getPlayerStatLogFromIDYear(player_id[0], 2024)
+
+#Write the career stats to a CSV file
+career_stats = pd.concat([stat_log_2018, stat_log_2019, stat_log_2020, stat_log_2021, stat_log_2022, stat_log_2023, stat_log_2024])
+career_stats.to_csv("tatum_career_stats.csv", index=False)
+                </code>
+              </pre>
+              <br><br>
+              <h3><strong>Conclusion</strong></h3>
+              <p>That's it for now! For this entry I was looking to just scrape some basic information on players and their stats. In the next installment of this series I'll be working on some data visualization using Matplotlib.</p>  
+              <br><br>
                 </div>
                 <div class="col-0"></div>
             </div>
